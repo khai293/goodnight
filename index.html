@@ -353,7 +353,7 @@
 </head>
 <body>
 
-<audio id="bgm" src="music.mp3" loop preload="auto"></audio>
+<audio id="bgm" src="music.mp3" preload="auto"></audio>
 
 <div id="nebula"></div>
 <div id="coreGlow"></div>
@@ -737,8 +737,10 @@ function assignTextTargets(str){
 
 /* ---------------- phase machine ------------------------------------------
    boot → heart(0s) → text1(10s) → heart(17s) → galaxy(25s)                 */
-const T_TEXT1=10, T_HEART2=17, T_GALAXY=25, T_FINAL=27.5;
-let mode="boot", mainStart=0, formK=0, galaxyT=-1, lastBeat=-1;
+/* the heart ↔ particle-text segments loop for the whole song;
+   the galaxy bloom is held back as the finale for when the music ends */
+const SEG_HEART=10, SEG_TEXT=7, LOOP_LEN=SEG_HEART+SEG_TEXT;
+let mode="boot", mainStart=0, formK=0, galaxyT=-1, lastBeat=-1, musicEnded=false;
 
 function setMode(m){
   if(mode===m) return;
@@ -808,10 +810,14 @@ function frame(){
 
   /* ---- timing / phases ---- */
   const mt=now-mainStart;
-  if(mt>=T_GALAXY)      setMode("galaxy");
-  else if(mt>=T_HEART2) setMode("heart");
-  else if(mt>=T_TEXT1)  setMode("text1");
-  else                  setMode("heart");
+  if(!musicEnded && bgm && (bgm.ended || (bgm.duration && bgm.currentTime>=bgm.duration-0.15)))
+    musicEnded=true;                          // song finished → time for the grand finale
+  if(musicEnded){
+    setMode("galaxy");                        // heart blooms into a galaxy, then holds
+  } else {
+    const c=mt%LOOP_LEN;                      // loop heart ↔ particle-text the whole song long
+    setMode(c<SEG_HEART ? "heart" : "text1");
+  }
 
   /* heartbeat */
   const bi=Math.floor(mt/BEAT_PERIOD);
@@ -989,8 +995,8 @@ function frame(){
   ctx.globalAlpha=1;
   ctx.globalCompositeOperation="source-over";
 
-  /* final message */
-  if(mt>=T_FINAL && !$("final").classList.contains("show"))
+  /* final message — blooms with the galaxy once the song ends */
+  if(musicEnded && galaxyT>0 && (now-galaxyT)>2.6 && !$("final").classList.contains("show"))
     $("final").classList.add("show");
 }
 
