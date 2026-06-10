@@ -124,6 +124,63 @@
   }
   #skip:hover{opacity:1;color:var(--pink)}
 
+  /* ---- START screen ---- */
+  #startScreen{
+    position:fixed;inset:0;z-index:60;
+    display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at 50% 42%, #0c0614 0%, var(--bg) 72%);
+    transition:opacity 1s ease;
+  }
+  #startScreen.gone{opacity:0;pointer-events:none}
+  #startInner{text-align:center;padding:0 6vw;animation:termIn .9s cubic-bezier(.2,.9,.25,1.2) both}
+  #startTitle{
+    font-family:var(--mono);
+    font-size:clamp(11px,2.2vw,14px);letter-spacing:6px;
+    color:var(--pink);
+    text-shadow:0 0 16px rgba(255,107,157,0.55);
+    margin-bottom:20px;
+  }
+  #startName{
+    font-weight:700;
+    font-size:clamp(32px,8vw,68px);letter-spacing:1px;line-height:1.1;
+    color:#fff;
+    text-shadow:0 0 18px rgba(255,107,157,0.8),0 0 60px rgba(177,76,255,0.5);
+    margin-bottom:14px;
+  }
+  #startName .ext{color:var(--pink);text-shadow:0 0 18px rgba(255,107,157,0.75)}
+  #startSub{
+    font-family:var(--mono);
+    font-size:clamp(11px,1.6vw,14px);letter-spacing:3px;
+    color:var(--dim);margin-bottom:44px;
+  }
+  #startBtn{
+    font-family:var(--mono);
+    font-size:clamp(14px,2vw,18px);letter-spacing:5px;font-weight:600;
+    color:#fff;cursor:pointer;
+    padding:17px 56px;border-radius:99px;
+    background:linear-gradient(120deg, rgba(177,76,255,0.22), rgba(255,45,85,0.22));
+    border:1px solid rgba(255,107,157,0.5);
+    box-shadow:0 0 30px rgba(255,45,85,0.35), inset 0 1px 0 rgba(255,255,255,0.15);
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    transition:transform .25s, box-shadow .35s, background .35s;
+    animation:startPulse 2.4s ease-in-out infinite;
+  }
+  #startBtn:hover{
+    transform:translateY(-2px) scale(1.04);
+    background:linear-gradient(120deg, rgba(177,76,255,0.42), rgba(255,45,85,0.42));
+    box-shadow:0 0 50px rgba(255,45,85,0.6), inset 0 1px 0 rgba(255,255,255,0.25);
+  }
+  #startBtn:active{transform:scale(.98)}
+  @keyframes startPulse{
+    0%,100%{box-shadow:0 0 26px rgba(255,45,85,0.3), inset 0 1px 0 rgba(255,255,255,0.15)}
+    50%{box-shadow:0 0 46px rgba(255,45,85,0.6), inset 0 1px 0 rgba(255,255,255,0.22)}
+  }
+  #startNote{
+    margin-top:30px;
+    font-family:var(--mono);font-size:11px;letter-spacing:2px;
+    color:var(--dim);opacity:0.7;
+  }
+
   /* ---- main scene UI ---- */
   .ui{opacity:0;transition:opacity 1.6s ease}
   body.main .ui{opacity:1}
@@ -296,10 +353,23 @@
 </head>
 <body>
 
+<audio id="bgm" src="music.mp3" loop preload="auto"></audio>
+
 <div id="nebula"></div>
 <div id="coreGlow"></div>
 <canvas id="cv"></canvas>
 <div id="grain"></div>
+
+<!-- ============ START ============ -->
+<div id="startScreen">
+  <div id="startInner">
+    <div id="startTitle">✦&nbsp;NIGHT-MODE&nbsp;v2.0</div>
+    <div id="startName">🌙&nbsp;SweetDreams<span class="ext">.exe</span></div>
+    <div id="startSub">a little something, made with love</div>
+    <button id="startBtn">▶&nbsp;START</button>
+    <div id="startNote">♪&nbsp;sound&nbsp;on&nbsp;·&nbsp;best&nbsp;with&nbsp;headphones&nbsp;🎧</div>
+  </div>
+</div>
 
 <!-- ============ BOOT ============ -->
 <div id="boot">
@@ -540,20 +610,33 @@ function thump(dt, vol){
   o.start(t0); o.stop(t0+0.32);
 }
 function playBeat(){ thump(0,1); thump(0.20,0.55); }
+/* ---------------- background music ------------------------------------- */
+const bgm=$("bgm");
+const MUSIC_VOL=0.6;
+if(bgm) bgm.volume=0;            // start silent; fade in on launch
+let musicFade=null;
+function fadeMusicTo(target){
+  if(!bgm) return;
+  if(musicFade) clearInterval(musicFade);
+  if(target>0 && bgm.paused) bgm.play().catch(()=>{});
+  musicFade=setInterval(()=>{
+    const step=0.035;
+    if(Math.abs(bgm.volume-target)<=step){ bgm.volume=target; clearInterval(musicFade); musicFade=null;
+      if(target===0) bgm.pause();
+    } else bgm.volume += bgm.volume<target ? step : -step;
+  },55);
+}
+
 function toggleSound(force){
   initAudio();
-  if(!actx) return;
   sndOn = force!==undefined ? force : !sndOn;
-  if(sndOn && actx.state==="suspended") actx.resume();
+  if(actx && sndOn && actx.state==="suspended") actx.resume();
+  if(bgm){ if(sndOn) fadeMusicTo(MUSIC_VOL); else fadeMusicTo(0); }
   $("sndBtn").classList.toggle("on", sndOn);
   $("sndBtn").innerHTML = sndOn ? "♪&nbsp;SOUND&nbsp;ON" : "♪&nbsp;SOUND&nbsp;OFF";
   document.body.classList.toggle("sndOn", sndOn);
 }
 $("sndBtn").addEventListener("click", e=>{ e.stopPropagation(); toggleSound(); });
-window.addEventListener("pointerdown", function once(){
-  if(!sndOn) toggleSound(true);
-  window.removeEventListener("pointerdown", once);
-}, {once:false});
 
 /* ---------------- heartbeat curve --------------------------------------- */
 const BEAT_PERIOD = 1.05;                       // ≈ 57 visual bpm, calm
@@ -1014,10 +1097,21 @@ $("replay").addEventListener("click",()=>location.reload());
 /* debug: jump the timeline to second s (verification aid) */
 window.__seek = s => { mainStart = performance.now()/1000 - s; };
 
+/* ---------------- launch (START button) --------------------------------- */
+let launched=false;
+function launch(){
+  if(launched) return; launched=true;
+  toggleSound(true);                       // music + heartbeat on (this is the user gesture)
+  $("startScreen").classList.add("gone");
+  setTimeout(()=>{ const s=$("startScreen"); if(s) s.style.display="none"; }, 1050);
+  boot();
+}
+$("startBtn").addEventListener("click", e=>{ e.stopPropagation(); launch(); });
+
 /* ---------------- go ----------------------------------------------------- */
 resize();
 requestAnimationFrame(frame);
-boot();
+/* boot() now starts only when the user presses START */
 </script>
 </body>
 </html>
