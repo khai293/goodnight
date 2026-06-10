@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>SweetDreams.exe</title>
+<style>
+  :root{
+    --bg:#050505;
+    --red:#ff2d55;
+    --pink:#ff6b9d;
+    --purple:#b14cff;
+    --cyan:#4cc9f0;
+    --text:#f5f0f2;
+    --dim:#8a8090;
+    --glass:rgba(255,255,255,0.045);
+    --glass-border:rgba(255,255,255,0.10);
+    --mono:ui-monospace,"Cascadia Code","JetBrains Mono",Consolas,"Courier New",monospace;
+    --sans:-apple-system,"SF Pro Display",BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    user-select:none;
+    cursor:crosshair;
+  }
+
+  /* ---- ambient nebula ---- */
+  #nebula{
+    position:fixed;inset:-20%;z-index:0;pointer-events:none;
+    background:
+      radial-gradient(ellipse 42% 38% at 28% 68%, rgba(177,76,255,0.10), transparent 70%),
+      radial-gradient(ellipse 46% 42% at 72% 30%, rgba(255,45,85,0.09), transparent 70%),
+      radial-gradient(ellipse 30% 30% at 55% 60%, rgba(255,107,157,0.06), transparent 70%);
+    transition:transform 0.6s cubic-bezier(.2,.8,.2,1);
+    will-change:transform;
+  }
+  #coreGlow{
+    position:fixed;left:50%;top:50%;z-index:1;pointer-events:none;
+    width:60vmin;height:60vmin;border-radius:50%;
+    transform:translate(-50%,-50%);
+    background:radial-gradient(circle, rgba(255,45,85,0.16) 0%, rgba(177,76,255,0.07) 45%, transparent 70%);
+    opacity:0;transition:opacity 2.5s ease;
+    will-change:transform,opacity;
+  }
+  canvas{position:fixed;inset:0;z-index:2;display:block}
+
+  /* ---- scanlines / vignette ---- */
+  #grain{
+    position:fixed;inset:0;z-index:9;pointer-events:none;
+    background:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px),
+      radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%);
+  }
+
+  /* ---- glass panels ---- */
+  .glass{
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    border-radius:14px;
+    backdrop-filter:blur(18px) saturate(1.4);
+    -webkit-backdrop-filter:blur(18px) saturate(1.4);
+    box-shadow:0 8px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+
+  /* ---- boot terminal ---- */
+  #boot{
+    position:fixed;inset:0;z-index:50;
+    display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at 50% 40%, #0a0510 0%, var(--bg) 70%);
+    transition:opacity 1.4s ease;
+  }
+  #boot.gone{opacity:0;pointer-events:none}
+  #terminal{
+    width:min(640px, 92vw);
+    font-family:var(--mono);
+    font-size:clamp(12px, 2.3vw, 15px);
+    overflow:hidden;
+    animation:termIn .8s cubic-bezier(.2,.9,.25,1.2) both;
+  }
+  @keyframes termIn{from{opacity:0;transform:translateY(26px) scale(.96)}to{opacity:1;transform:none}}
+  #termBar{
+    display:flex;align-items:center;gap:8px;
+    padding:11px 14px;
+    border-bottom:1px solid rgba(255,255,255,0.07);
+    background:rgba(255,255,255,0.03);
+  }
+  .dot{width:11px;height:11px;border-radius:50%}
+  .dot.r{background:#ff5f57}.dot.y{background:#febc2e}.dot.g{background:#28c840}
+  #termTitle{margin-left:8px;color:var(--dim);font-size:0.85em;letter-spacing:0.4px}
+  #termBody{padding:20px 22px 26px;min-height:15.5em;line-height:1.9}
+  .tline{color:#e8d8e4;white-space:pre-wrap;word-break:break-word;text-shadow:0 0 12px rgba(255,107,157,0.25)}
+  .tline .p{color:var(--pink)}
+  .tline.ok{color:#7dffa8;text-shadow:0 0 12px rgba(125,255,168,0.3)}
+  .tline.hl{color:var(--pink);text-shadow:0 0 16px rgba(255,107,157,0.55)}
+  .caret{
+    display:inline-block;width:0.55em;height:1.1em;
+    background:var(--pink);vertical-align:-0.18em;margin-left:2px;
+    box-shadow:0 0 10px var(--pink);
+    animation:blink 0.9s steps(1) infinite;
+  }
+  @keyframes blink{50%{opacity:0}}
+  #progWrap{display:none;margin-top:10px}
+  #progLabel{color:var(--dim);font-size:0.85em;margin-bottom:7px;letter-spacing:1px}
+  #progTrack{
+    height:8px;border-radius:99px;overflow:hidden;
+    background:rgba(255,255,255,0.06);
+    border:1px solid rgba(255,255,255,0.08);
+  }
+  #progFill{
+    height:100%;width:0%;border-radius:99px;
+    background:linear-gradient(90deg, var(--purple), var(--red), var(--pink));
+    box-shadow:0 0 18px rgba(255,45,85,0.8);
+  }
+  #progPct{color:var(--pink);margin-top:7px;font-size:0.85em;text-shadow:0 0 10px rgba(255,107,157,0.5)}
+  #skip{
+    position:fixed;bottom:26px;left:50%;transform:translateX(-50%);
+    color:var(--dim);font-family:var(--mono);font-size:12px;
+    letter-spacing:2px;cursor:pointer;opacity:0.6;z-index:51;
+  }
+  #skip:hover{opacity:1;color:var(--pink)}
+
+  /* ---- main scene UI ---- */
+  .ui{opacity:0;transition:opacity 1.6s ease}
+  body.main .ui{opacity:1}
+
+  #names{
+    position:fixed;left:50%;top:50%;z-index:5;
+    transform:translate(-50%,-50%);
+    text-align:center;pointer-events:none;
+    font-weight:700;
+    font-size:clamp(19px, 4.2vw, 34px);
+    letter-spacing:1.5px;
+    color:#fff;
+    text-shadow:0 0 14px rgba(255,107,157,0.9), 0 0 44px rgba(255,45,85,0.7), 0 0 90px rgba(177,76,255,0.5);
+    transition:opacity 1.2s ease;
+    will-change:transform,opacity;
+  }
+  #names .sub{
+    display:block;margin-top:8px;
+    font-family:var(--mono);font-weight:400;
+    font-size:clamp(9px, 1.5vw, 12px);
+    letter-spacing:4px;color:rgba(255,200,220,0.65);
+    text-shadow:0 0 10px rgba(255,107,157,0.4);
+  }
+  #names.hidden{opacity:0}
+
+  /* code editor */
+  #codePanel{
+    position:fixed;z-index:6;
+    right:max(3.5vw, 24px);top:50%;
+    transform:translateY(-50%);
+    width:min(330px, 38vw);
+    font-family:var(--mono);
+    font-size:clamp(11px, 1.15vw, 13.5px);
+    transition:opacity 1.6s ease, filter 1.6s ease;
+  }
+  #codePanel.dim{opacity:0.22;filter:blur(1px)}
+  #codeBar{
+    display:flex;align-items:center;gap:7px;
+    padding:9px 13px;border-bottom:1px solid rgba(255,255,255,0.07);
+  }
+  #codeBar .dot{width:9px;height:9px}
+  #codeTitle{margin-left:6px;color:var(--dim);font-size:0.8em;letter-spacing:0.5px}
+  #codeBody{padding:15px 17px 18px;line-height:1.85;min-height:13.5em}
+  .cl{white-space:pre;min-height:1.85em}
+  .kw{color:#ff6bd5;text-shadow:0 0 8px rgba(255,107,213,0.45)}
+  .fn{color:#7ad7ff;text-shadow:0 0 8px rgba(122,215,255,0.4)}
+  .id{color:#e8e3ff}
+  .str{color:#ffb37a;text-shadow:0 0 8px rgba(255,179,122,0.35)}
+  .num{color:#c79bff}
+  .bool{color:#c79bff}
+  .op{color:#ff6b9d}
+  .pn{color:#9a90a8}
+  .cmt{color:#5e5570;font-style:italic}
+
+  /* HUD */
+  #hud{
+    position:fixed;z-index:6;
+    left:max(3.5vw, 24px);top:max(3.5vh, 22px);
+    padding:13px 17px;
+    font-family:var(--mono);
+    font-size:clamp(10px, 1.05vw, 12px);
+    line-height:2;letter-spacing:1px;
+    color:var(--dim);
+  }
+  #hud b{color:var(--pink);font-weight:400;text-shadow:0 0 8px rgba(255,107,157,0.5)}
+  #hud .live{color:#7dffa8;text-shadow:0 0 8px rgba(125,255,168,0.4)}
+  #hud .pulseDot{
+    display:inline-block;width:7px;height:7px;border-radius:50%;
+    background:var(--red);margin-right:7px;vertical-align:1px;
+    box-shadow:0 0 8px var(--red);
+    animation:blink 1.1s ease infinite;
+  }
+
+  /* sound toggle */
+  #sndBtn{
+    position:fixed;z-index:7;
+    right:max(3.5vw, 24px);top:max(3.5vh, 22px);
+    padding:9px 16px;cursor:pointer;
+    font-family:var(--mono);font-size:11px;letter-spacing:2px;
+    color:var(--dim);
+    transition:color .3s, box-shadow .3s;
+  }
+  #sndBtn:hover{color:var(--pink)}
+  #sndBtn.on{color:var(--pink);box-shadow:0 0 22px rgba(255,45,85,0.25), inset 0 1px 0 rgba(255,255,255,0.06)}
+  #hint{
+    position:fixed;z-index:7;bottom:22px;left:50%;transform:translateX(-50%);
+    font-family:var(--mono);font-size:11px;letter-spacing:2px;
+    color:var(--dim);opacity:0;transition:opacity 1s ease;
+    pointer-events:none;
+  }
+  body.main #hint{opacity:0.55}
+  body.sndOn #hint{opacity:0 !important}
+
+  /* floating good-night whispers */
+  #floatMsg{
+    position:fixed;z-index:6;left:50%;bottom:7vh;
+    transform:translateX(-50%);
+    font-family:var(--mono);
+    font-size:clamp(11px, 1.3vw, 14px);
+    letter-spacing:3px;text-align:center;white-space:nowrap;
+    color:rgba(255,205,225,0.9);
+    text-shadow:0 0 14px rgba(255,107,157,0.55), 0 0 40px rgba(177,76,255,0.35);
+    opacity:0;pointer-events:none;
+    will-change:opacity,transform;
+  }
+  @media (max-width:1060px){
+    #floatMsg{bottom:32px;font-size:10px;letter-spacing:1.5px}
+  }
+
+  /* final message */
+  #final{
+    position:fixed;inset:0;z-index:8;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:14px;text-align:center;pointer-events:none;
+    padding:0 7vw;
+  }
+  #final p{
+    font-size:clamp(18px, 3.4vw, 30px);
+    font-weight:300;letter-spacing:1px;line-height:1.5;
+    color:#fff;
+    text-shadow:0 0 18px rgba(255,107,157,0.7), 0 0 60px rgba(177,76,255,0.45);
+    opacity:0;transform:translateY(18px);
+    transition:opacity 2.4s ease, transform 2.4s cubic-bezier(.2,.8,.2,1);
+  }
+  #final p.lead{
+    font-size:clamp(26px, 5vw, 44px);
+    font-weight:600;margin-bottom:6px;
+  }
+  #final p:nth-child(2){transition-delay:1.3s}
+  #final p:nth-child(3){transition-delay:2.6s}
+  #final p:nth-child(4){transition-delay:3.9s}
+  #final .sig{
+    margin-top:14px;
+    font-family:var(--mono);font-size:clamp(11px,1.6vw,14px);
+    letter-spacing:5px;color:rgba(255,140,180,0.8);
+    text-shadow:0 0 14px rgba(255,45,85,0.6);
+    opacity:0;transition:opacity 2.4s ease 5.2s;
+  }
+  #final.show p{opacity:1;transform:none}
+  #final.show .sig{opacity:1}
+
+  #replay{
+    position:fixed;z-index:10;
+    right:max(3.5vw, 24px);bottom:max(3.5vh, 22px);
+    padding:10px 20px;cursor:pointer;
+    font-family:var(--mono);font-size:11px;letter-spacing:3px;
+    color:var(--dim);opacity:0;pointer-events:none;
+    transition:opacity 1.5s ease 4.5s, color .3s;
+  }
+  #replay:hover{color:var(--pink)}
+  body.final #replay{opacity:0.8;pointer-events:auto}
+
+  /* ---- narrow / mobile: code panel drops below the heart ---- */
+  @media (max-width:1060px){
+    #codePanel{
+      right:50%;top:auto;bottom:max(56px, 8vh);
+      transform:translateX(50%);
+      width:min(330px, 88vw);
+      font-size:11px;
+    }
+    #codeBody{min-height:0;padding:11px 14px 13px;line-height:1.7}
+    #names{top:37%}
+  }
+  @media (max-width:760px){
+    #hud{padding:10px 13px;line-height:1.8}
+    #hud .hideM{display:none}
+    #hint{bottom:10px}
+  }
+</style>
+</head>
+<body>
+
+<div id="nebula"></div>
+<div id="coreGlow"></div>
+<canvas id="cv"></canvas>
+<div id="grain"></div>
+
+<!-- ============ BOOT ============ -->
+<div id="boot">
+  <div id="terminal" class="glass">
+    <div id="termBar">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span id="termTitle">khai@night: ~/dreams — night-mode v2.0</span>
+    </div>
+    <div id="termBody">
+      <div id="termLines"></div>
+      <div id="progWrap">
+        <div id="progLabel">LAUNCHING&nbsp;SWEETDREAMS.EXE</div>
+        <div id="progTrack"><div id="progFill"></div></div>
+        <div id="progPct">0%</div>
+      </div>
+    </div>
+  </div>
+  <div id="skip">CLICK&nbsp;TO&nbsp;SKIP&nbsp;▸</div>
+</div>
+
+<!-- ============ MAIN UI ============ -->
+<div id="names" class="ui hidden">
+  Good Night, Baby&nbsp;❤️
+  <span class="sub">SWEET&nbsp;DREAMS&nbsp;·&nbsp;SEE&nbsp;YOU&nbsp;TOMORROW</span>
+</div>
+
+<div id="codePanel" class="glass ui">
+  <div id="codeBar">
+    <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+    <span id="codeTitle">goodnight.js</span>
+  </div>
+  <div id="codeBody"></div>
+</div>
+
+<div id="hud" class="glass ui">
+  <div><span class="pulseDot"></span>NIGHT-OS&nbsp;<span class="live">RUNNING</span></div>
+  <div class="hideM">DREAMS&nbsp;&nbsp;<b>sweet</b>&nbsp;<span class="live">✓</span></div>
+  <div>BPM&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b id="bpm">—</b></div>
+  <div class="hideM">UPTIME&nbsp;&nbsp;<b id="uptime">00:00</b></div>
+</div>
+
+<div id="sndBtn" class="glass ui">♪&nbsp;SOUND&nbsp;OFF</div>
+<div id="floatMsg" class="ui"></div>
+<div id="hint">tap anywhere for a soft heartbeat</div>
+
+<div id="final">
+  <p class="lead">Good Night&nbsp;❤️</p>
+  <p>May the stars watch over you,</p>
+  <p>the moon light your dreams,</p>
+  <p>and tomorrow bring you happiness.</p>
+  <span class="sig">♥&nbsp;KHẢI</span>
+</div>
+<div id="replay" class="glass">↺&nbsp;REPLAY</div>
+
+<script>
+"use strict";
+/* ================================================================
+   love.exe — a confession, compiled in real time.
+   Single file. No libraries. Canvas particle engine + WebAudio.
+   ================================================================ */
+
+const $ = id => document.getElementById(id);
+const cv = $("cv"), ctx = cv.getContext("2d");
+const clamp = (v,a,b)=>v<a?a:v>b?b:v;
+const lerp = (a,b,t)=>a+(b-a)*t;
+const rnd = (a=1,b)=> b===undefined ? Math.random()*a : a+Math.random()*(b-a);
+const TAU = Math.PI*2;
+
+let W=0, H=0, DPR=1, CX=0, CY=0, R=0;
+const MOBILE = matchMedia("(max-width:760px)").matches || "ontouchstart" in window;
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function resize(){
+  DPR = clamp(window.devicePixelRatio||1, 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = W*DPR; cv.height = H*DPR;
+  cv.style.width = W+"px"; cv.style.height = H+"px";   // replaced element: must size explicitly for HiDPI
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  const narrow = W<1060;                 // code panel sits below the heart
+  CX = W/2; CY = H*(narrow?0.37:0.5);
+  R = Math.min(W,H)*(narrow?0.25:0.26);
+  if (mode==="text1") assignTextTargets(TXT1);
+}
+window.addEventListener("resize", resize);
+
+/* ---------------- sprites (pre-rendered glow dots & tiny hearts) -------- */
+const PALETTE = ["#ff2d55","#ff6b9d","#b14cff","#ff8fb8","#d96bff"];
+function glowSprite(color, size=64, core=0.18){
+  const c=document.createElement("canvas"); c.width=c.height=size;
+  const g=c.getContext("2d");
+  const grad=g.createRadialGradient(size/2,size/2,0,size/2,size/2,size/2);
+  grad.addColorStop(0,"rgba(255,255,255,0.98)");
+  grad.addColorStop(core,color);
+  grad.addColorStop(1,"rgba(0,0,0,0)");
+  g.fillStyle=grad; g.fillRect(0,0,size,size);
+  return c;
+}
+function heartSprite(color, size=48){
+  const c=document.createElement("canvas"); c.width=c.height=size;
+  const g=c.getContext("2d"), s=size/32;
+  g.translate(size*0.5-16*s, size*0.5-15.5*s);
+  g.scale(s,s);
+  g.beginPath();
+  g.moveTo(16,29);
+  g.bezierCurveTo(8,22, 2,16, 2,10);
+  g.bezierCurveTo(2,5, 6,2, 10,2);
+  g.bezierCurveTo(13,2, 15,4, 16,6.5);
+  g.bezierCurveTo(17,4, 19,2, 22,2);
+  g.bezierCurveTo(26,2, 30,5, 30,10);
+  g.bezierCurveTo(30,16, 24,22, 16,29);
+  g.closePath();
+  g.shadowColor=color; g.shadowBlur=10;
+  g.fillStyle=color; g.fill();
+  g.shadowBlur=0;
+  g.globalAlpha=0.85;
+  g.fillStyle="rgba(255,255,255,0.35)";
+  g.fill();
+  g.globalAlpha=1; g.fillStyle=color; g.globalCompositeOperation="multiply";
+  return c;
+}
+const DOTS   = PALETTE.map(c=>glowSprite(c));
+const TXTDOTS= PALETTE.map(c=>glowSprite(c,64,0.34));   // brighter white core, baked in: one draw per dot
+const HEARTS = PALETTE.map(c=>heartSprite(c));
+const WHITEDOT = glowSprite("#ffd9e8");
+
+/* ---------------- 3D heart shell (Taubin implicit surface) -------------- */
+/* (x² + 9/4·y² + z² − 1)³ − x²z³ − 9/80·y²z³ = 0 ; z is vertical          */
+/* maxAbsY restricts samples to the y≈0 slab — that band IS the face-on
+   silhouette of the surface, so it traces the heart's outline curve */
+function sampleHeartShell(n, band, maxAbsY){
+  const pts=[]; let guard=0, b=band;
+  const ySpan=maxAbsY!==undefined?maxAbsY:1.4;
+  while(pts.length<n && guard++<2000000){
+    const x=rnd(-1.4,1.4), y=rnd(-ySpan,ySpan), z=rnd(-1.3,1.5);
+    const x2=x*x, y2=y*y, z2=z*z;
+    const a=x2 + 2.25*y2 + z2 - 1;
+    const f=a*a*a - x2*z2*z - 0.1125*y2*z2*z;
+    if (Math.abs(f) < b) pts.push({x,y,z});
+    if (guard%400000===0) b*=1.5;        // safety: widen if too strict
+  }
+  return pts;
+}
+
+/* ---------------- particles --------------------------------------------- */
+const N_HEART = REDUCED? 500 : (MOBILE? 870 : 1550);   // +40% density
+const N_ORBIT = REDUCED? 120 : (MOBILE? 220 : 380);
+const N_TXT   = REDUCED? 1000 : (MOBILE? 2600 : 4500);   // dedicated pool: 4x total density for particle text
+const N_STAR  = MOBILE? 130 : 240;
+
+const particles=[];
+(function init(){
+  /* two layers: a soft body shell + a tight rim that hugs the exact surface,
+     tracing the lobes, cusp and tip so the silhouette reads clearly */
+  const nRim=Math.round(N_HEART*0.42);
+  const body=sampleHeartShell(N_HEART-nRim, 0.012);
+  const rim =sampleHeartShell(nRim, 0.006, 0.16);
+  for(let i=0;i<N_HEART;i++){
+    const onRim=i>=N_HEART-nRim;
+    const s=onRim ? rim[(i-(N_HEART-nRim))%rim.length] : body[i%body.length];
+    particles.push({
+      type:"heart", hx:s.x, hy:s.y, hz:s.z, edge:onRim,
+      x:rnd(W||innerWidth), y:rnd(H||innerHeight),
+      k:rnd(0.05,0.12),
+      ci:Math.random()<0.7 ? (Math.random()<0.55?0:1) : (Math.random()<0.6?3:2),
+      sz:onRim?rnd(1.4,2.8):rnd(1.7,3.4), tw:rnd(TAU), tws:rnd(0.5,2),
+      tx:0, ty:0, jx:rnd(-3,3), jy:rnd(-3,3),
+      gu:Math.pow(Math.random(),0.85), garm:(Math.random()*3)|0, gj:rnd(-0.45,0.45),
+      hi:(Math.random()*PALETTE.length)|0, gs:rnd(0.55,1.25),
+    });
+  }
+  for(let i=0;i<N_ORBIT;i++){
+    particles.push({
+      type:"orbit",
+      or:rnd(1.25,2.35), oi:rnd(-0.9,0.9), os:rnd(0.12,0.5)*(Math.random()<0.5?-1:1),
+      op:rnd(TAU), ow:rnd(0.6,1.4),
+      x:rnd(W||innerWidth), y:rnd(H||innerHeight),
+      k:rnd(0.04,0.09),
+      ci:Math.random()<0.5?2:(Math.random()<0.5?4:1),
+      sz:rnd(1.4,3.2), tw:rnd(TAU), tws:rnd(1,3),
+      tx:0, ty:0, jx:rnd(-3,3), jy:rnd(-3,3),
+      gu:Math.pow(Math.random(),0.85), garm:(Math.random()*3)|0, gj:rnd(-0.45,0.45),
+      hi:(Math.random()*PALETTE.length)|0, gs:rnd(0.45,1.0),
+    });
+  }
+  /* text-only pool — active during the particle-text phase, bright pink/white */
+  for(let i=0;i<N_TXT;i++){
+    particles.push({
+      type:"txt",
+      x:rnd(W||innerWidth), y:rnd(H||innerHeight),
+      k:rnd(0.13,0.22),
+      ci:Math.random()<0.55?1:(Math.random()<0.6?3:0),
+      sz:rnd(1.3,2.9), tw:rnd(TAU), tws:rnd(0.5,2),
+      tx:0, ty:0, spark:Math.random()<0.12,
+    });
+  }
+})();
+
+/* stars */
+const stars=[];
+for(let i=0;i<N_STAR;i++){
+  stars.push({
+    nx:Math.random(), ny:Math.random(),
+    depth:rnd(0.25,1), sz:rnd(0.5,1.7),
+    tw:rnd(TAU), tws:rnd(0.4,1.6),
+    ox:0, oy:0,
+  });
+}
+
+/* ---------------- mouse / touch ----------------------------------------- */
+const mouse={x:-9999,y:-9999,ax:-9999,ay:-9999,active:false};
+function onMove(x,y){ mouse.x=x; mouse.y=y; mouse.active=true; }
+window.addEventListener("pointermove", e=>onMove(e.clientX,e.clientY), {passive:true});
+window.addEventListener("touchmove", e=>{ const t=e.touches[0]; if(t) onMove(t.clientX,t.clientY); }, {passive:true});
+window.addEventListener("pointerleave", ()=>{ mouse.active=false; });
+
+/* ---------------- audio: heartbeat -------------------------------------- */
+let actx=null, master=null, sndOn=false;
+function initAudio(){
+  if(actx) return;
+  try{
+    actx = new (window.AudioContext||window.webkitAudioContext)();
+    master = actx.createGain();
+    master.gain.value = 0.22;
+    master.connect(actx.destination);
+  }catch(e){ actx=null; }
+}
+function thump(dt, vol){
+  if(!actx) return;
+  const t0=actx.currentTime+dt;
+  const o=actx.createOscillator(), g=actx.createGain();
+  o.type="sine";
+  o.frequency.setValueAtTime(56,t0);
+  o.frequency.exponentialRampToValueAtTime(36,t0+0.20);
+  g.gain.setValueAtTime(0.0001,t0);
+  g.gain.exponentialRampToValueAtTime(0.6*vol,t0+0.018);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+0.30);
+  o.connect(g); g.connect(master);
+  o.start(t0); o.stop(t0+0.32);
+}
+function playBeat(){ thump(0,1); thump(0.20,0.55); }
+function toggleSound(force){
+  initAudio();
+  if(!actx) return;
+  sndOn = force!==undefined ? force : !sndOn;
+  if(sndOn && actx.state==="suspended") actx.resume();
+  $("sndBtn").classList.toggle("on", sndOn);
+  $("sndBtn").innerHTML = sndOn ? "♪&nbsp;SOUND&nbsp;ON" : "♪&nbsp;SOUND&nbsp;OFF";
+  document.body.classList.toggle("sndOn", sndOn);
+}
+$("sndBtn").addEventListener("click", e=>{ e.stopPropagation(); toggleSound(); });
+window.addEventListener("pointerdown", function once(){
+  if(!sndOn) toggleSound(true);
+  window.removeEventListener("pointerdown", once);
+}, {once:false});
+
+/* ---------------- heartbeat curve --------------------------------------- */
+const BEAT_PERIOD = 1.05;                       // ≈ 57 visual bpm, calm
+function beatPulse(ph){                          // ph 0..1 → lub-dub
+  const b1=Math.exp(-Math.pow((ph-0.05)/0.045,2));
+  const b2=0.55*Math.exp(-Math.pow((ph-0.25)/0.06,2));
+  return b1+b2;
+}
+
+/* ---------------- text → particle targets ------------------------------- */
+const TXT1="May your dreams be as beautiful as your smile.";
+const FLOATS=[
+  "Don't stay up too late.",
+  "Get some good rest.",
+  "Tomorrow will be a beautiful day.",
+];
+const offC=document.createElement("canvas"), offX=offC.getContext("2d");
+let txtGlow=null, txtGW=0, txtGH=0, txtFade=0;
+let txtCache=null, txtCacheReady=false, txtEnter=0;
+
+/* split a sentence into n visually balanced lines */
+function splitBalanced(str, n){
+  if(n<=1) return [str];
+  const words=str.split(" "), lines=[], target=str.length/n;
+  let cur="";
+  for(const w of words){
+    if(cur && cur.length+1+w.length > target*1.12 && lines.length<n-1){ lines.push(cur); cur=w; }
+    else cur = cur ? cur+" "+w : w;
+  }
+  lines.push(cur);
+  return lines;
+}
+
+function textPoints(str){
+  const lines=splitBalanced(str, W<560?3:2);
+  const maxW=Math.min(W*0.86, 1100);
+  const fam=getComputedStyle(document.body).fontFamily;
+  offX.font=`700 150px ${fam}`;
+  offX.letterSpacing="7.5px";
+  let widest=1;
+  for(const ln of lines) widest=Math.max(widest, offX.measureText(ln).width);
+  const fs=clamp(150*maxW/widest, 16, Math.min(118, H*0.5/(lines.length*1.42)));
+  const lh=fs*1.42, pad=fs*0.45;
+  offC.width=Math.ceil(maxW)+60;
+  offC.height=Math.ceil(lines.length*lh + pad*2);
+  offX.clearRect(0,0,offC.width,offC.height);
+  offX.font=`700 ${fs}px ${fam}`;
+  offX.letterSpacing=(fs*0.05).toFixed(1)+"px";
+  offX.fillStyle="#fff";
+  offX.textAlign="center"; offX.textBaseline="middle";
+  lines.forEach((ln,i)=>offX.fillText(ln, offC.width/2, pad+lh*(i+0.5)));
+
+  /* pre-rendered bloom underlay: wide pink halo + tight white core glow */
+  txtGW=offC.width+90; txtGH=offC.height+90;
+  txtGlow=document.createElement("canvas");
+  txtGlow.width=txtGW; txtGlow.height=txtGH;
+  const g=txtGlow.getContext("2d");
+  g.filter="blur(14px)";
+  g.drawImage(offC,45,45);
+  g.filter="none";
+  g.globalCompositeOperation="source-in";
+  g.fillStyle="rgb(255,95,155)";
+  g.fillRect(0,0,txtGW,txtGH);
+  g.globalCompositeOperation="lighter";
+  g.filter="blur(3px)";
+  g.globalAlpha=0.6;
+  g.drawImage(offC,45,45);
+
+  const target=particles.length*1.25;
+  let step=2, pts;
+  do{
+    pts=[];
+    const d=offX.getImageData(0,0,offC.width,offC.height).data;
+    for(let y=0;y<offC.height;y+=step)
+      for(let x=0;x<offC.width;x+=step)
+        if(d[(y*offC.width+x)*4+3]>120) pts.push({x,y});
+    step++;
+  }while(pts.length>target && step<10);
+
+  const ox=CX-offC.width/2, oy=CY-offC.height/2;
+  return pts.map(p=>({x:p.x+ox, y:p.y+oy}));
+}
+
+function assignTextTargets(str){
+  const pts=textPoints(str);
+  if(!pts.length) return;
+  // shuffle, then assign cyclically: every sampled point gets covered — no gaps in glyphs
+  for(let i=pts.length-1;i>0;i--){
+    const j=(Math.random()*(i+1))|0, t=pts[i]; pts[i]=pts[j]; pts[j]=t;
+  }
+  for(let i=0;i<particles.length;i++){
+    const p=particles[i], t=pts[i%pts.length];
+    p.tx=t.x+rnd(-0.6,0.6);
+    p.ty=t.y+rnd(-0.6,0.6);
+  }
+  txtCacheReady=false;            // targets moved — rebuild the settled layer
+}
+
+/* ---------------- phase machine ------------------------------------------
+   boot → heart(0s) → text1(10s) → heart(17s) → galaxy(25s)                 */
+const T_TEXT1=10, T_HEART2=17, T_GALAXY=25, T_FINAL=27.5;
+let mode="boot", mainStart=0, formK=0, galaxyT=-1, lastBeat=-1;
+
+function setMode(m){
+  if(mode===m) return;
+  mode=m;
+  const names=$("names");
+  if(m==="heart"){ names.classList.remove("hidden"); $("codePanel").classList.remove("dim"); }
+  if(m==="text1"){
+    names.classList.add("hidden");
+    $("codePanel").classList.add("dim");      // contrast: nothing competes with the text
+    assignTextTargets(TXT1);
+    txtEnter=performance.now()/1000;
+    for(const p of particles) if(p.type==="txt"){   // pool bursts out of the heart
+      const a=rnd(TAU), r=Math.sqrt(Math.random())*R*1.1;
+      p.x=CX+Math.cos(a)*r; p.y=CY+Math.sin(a)*r;
+    }
+  }
+  if(m==="galaxy"){
+    names.classList.add("hidden");
+    $("codePanel").classList.add("dim");
+    galaxyT=performance.now()/1000;
+    document.body.classList.add("final");
+  }
+}
+
+/* ---------------- render loop ------------------------------------------- */
+let rotA=0, prev=performance.now()/1000;
+
+function frame(){
+  requestAnimationFrame(frame);
+  const now=performance.now()/1000;
+  const dt=clamp(now-prev,0.001,0.05); prev=now;
+  if(W!==window.innerWidth || H!==window.innerHeight) resize();
+  ctx.clearRect(0,0,W,H);
+
+  /* smooth mouse */
+  if(mouse.ax<-999){ mouse.ax=mouse.x; mouse.ay=mouse.y; }
+  mouse.ax=lerp(mouse.ax, mouse.x, 0.12);
+  mouse.ay=lerp(mouse.ay, mouse.y, 0.12);
+  const mdx=(mouse.ax-CX)/W, mdy=(mouse.ay-CY)/H;
+
+  /* nebula parallax */
+  $("nebula").style.transform=`translate(${mdx*-26}px, ${mdy*-26}px)`;
+
+  /* ---- stars ---- */
+  ctx.globalCompositeOperation="source-over";
+  for(const s of stars){
+    s.tw+=s.tws*dt;
+    let sx=s.nx*W + mdx*-34*s.depth + s.ox;
+    let sy=s.ny*H + mdy*-34*s.depth + s.oy;
+    // stars flee softly from the cursor
+    if(mouse.active){
+      const dx=sx-mouse.ax, dy=sy-mouse.ay, d2=dx*dx+dy*dy;
+      if(d2<16900 && d2>1){
+        const d=Math.sqrt(d2), f=(1-d/130)*22;
+        s.ox+= (dx/d)*f*dt*6; s.oy+= (dy/d)*f*dt*6;
+      }
+    }
+    s.ox*=0.94; s.oy*=0.94;
+    const a=(0.25+0.55*(0.5+0.5*Math.sin(s.tw)))*s.depth;
+    ctx.globalAlpha=a;
+    ctx.fillStyle="#cfd4ff";
+    ctx.fillRect(sx,sy,s.sz,s.sz);
+  }
+  ctx.globalAlpha=1;
+
+  if(mode==="boot") return;
+
+  /* ---- timing / phases ---- */
+  const mt=now-mainStart;
+  if(mt>=T_GALAXY)      setMode("galaxy");
+  else if(mt>=T_HEART2) setMode("heart");
+  else if(mt>=T_TEXT1)  setMode("text1");
+  else                  setMode("heart");
+
+  /* heartbeat */
+  const bi=Math.floor(mt/BEAT_PERIOD);
+  const ph=(mt/BEAT_PERIOD)%1;
+  const pulse=beatPulse(ph);
+  if(bi!==lastBeat){ lastBeat=bi; if(sndOn) playBeat(); }   // the beat never stops
+
+  formK=Math.min(formK+dt*0.12, 0.42);          // formation tightens over ~3.5s
+  rotA=0.62*Math.sin(now*0.32);                  // gentle sway: never turns edge-on, stays recognizable
+  const beatScale=1+0.075*pulse;
+  const tilt=0.12+0.04*Math.sin(now*0.23);   // gentler lean keeps the notch and tip distinct
+
+  /* core glow + names breathe with the beat */
+  const cg=$("coreGlow");
+  cg.style.transform=`translate(-50%,-50%) scale(${(mode==="galaxy"?1.9:1)*(1+0.10*pulse)})`;
+  const names=$("names");
+  if(!names.classList.contains("hidden"))
+    names.style.transform=`translate(-50%,-50%) scale(${1+0.045*pulse})`;
+
+  /* floating good-night whispers — cycle while the heart is beating */
+  const fm=$("floatMsg");
+  if(mode==="heart" && mt>3){
+    const cyc=(mt-3)/5.6, u=cyc%1;
+    fm.textContent=FLOATS[Math.floor(cyc)%FLOATS.length];
+    fm.style.opacity=clamp(Math.min(u,1-u)*7,0,1)*0.92;
+    fm.style.transform=`translateX(-50%) translateY(${Math.sin(mt*0.8)*4}px)`;
+  } else fm.style.opacity=0;
+
+  /* HUD */
+  if((bi&1)===0){
+    $("bpm").textContent=Math.round(72+4.5*Math.sin(mt*0.31)+rnd(-1.2,1.2));
+    const s=Math.floor(mt);
+    $("uptime").textContent=String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
+  }
+
+  const galaxyAge = galaxyT>0 ? now-galaxyT : 0;
+  const gScale = galaxyT>0 ? 1-Math.pow(1-clamp(galaxyAge/2.6,0,1),3) : 0;  // easeOutCubic
+  const GR=Math.min(W,H)*0.62;
+
+  /* ---- particles ---- */
+  ctx.globalCompositeOperation="lighter";
+  const cosA=Math.cos(rotA), sinA=Math.sin(rotA);
+  const fov=7;            // mild perspective: front/back surfaces stay aligned, silhouette stays sharp
+
+  /* text bloom underlay — strong soft glow behind the letters */
+  txtFade=clamp(txtFade+(mode==="text1"?dt/0.35:-dt/0.5),0,1);
+  if(txtFade>0 && txtGlow){
+    ctx.globalAlpha=0.5*txtFade;
+    ctx.drawImage(txtGlow, CX-txtGW/2, CY-txtGH/2);
+    ctx.globalAlpha=1;
+  }
+
+  /* once the letters settle, bake the static pool into one layer (perf):
+     ~88% of text dots become a single drawImage; sparks stay live for twinkle */
+  if(mode==="text1" && !txtCacheReady && (now-txtEnter)>1.3){
+    txtCache=txtCache||document.createElement("canvas");
+    txtCache.width=Math.ceil(txtGW*DPR); txtCache.height=Math.ceil(txtGH*DPR);
+    const c=txtCache.getContext("2d");
+    c.setTransform(DPR,0,0,DPR,0,0);
+    c.globalCompositeOperation="lighter";
+    const ox=CX-txtGW/2, oy=CY-txtGH/2;
+    for(const q of particles){
+      if(q.type!=="txt"||q.spark) continue;
+      const s=q.sz*2.1;
+      c.globalAlpha=0.92;
+      c.drawImage(TXTDOTS[q.ci], q.tx-ox-s/2, q.ty-oy-s/2, s, s);
+    }
+    txtCacheReady=true;
+  }
+  if(txtCacheReady && txtFade>0){
+    ctx.globalAlpha=txtFade;
+    ctx.drawImage(txtCache, CX-txtGW/2, CY-txtGH/2, txtGW, txtGH);
+    ctx.globalAlpha=1;
+  }
+
+  for(let i=0;i<particles.length;i++){
+    const p=particles[i];
+
+    /* dedicated text pool: tight springs, steady light, no drift */
+    if(p.type==="txt"){
+      if(txtFade<=0 && mode!=="text1") continue;
+      if(txtCacheReady && !p.spark) continue;      // baked into the cached layer
+      if(mode==="text1"){
+        p.x+=(p.tx-p.x)*p.k;
+        p.y+=(p.ty-p.y)*p.k;
+      }
+      p.tw+=p.tws*dt;
+      const f=0.85+0.15*Math.sin(p.tw);
+      const s=p.sz*2.1;
+      ctx.globalAlpha=clamp(f*txtFade,0,1);
+      ctx.drawImage(TXTDOTS[p.ci], p.x-s/2, p.y-s/2, s, s);
+      continue;
+    }
+
+    let tx, ty, persp=1, isHeartSprite=false, sizeMul=1;
+
+    if(mode==="galaxy"){
+      /* spiral galaxy of tiny hearts */
+      const r=(0.10+0.90*Math.pow(p.gu,0.78))*GR*gScale;
+      const ang=p.garm*(TAU/3)+p.gu*4.6+now*0.11+p.gj;
+      tx=CX+Math.cos(ang)*r;
+      ty=CY+Math.sin(ang)*r*0.52 + Math.sin(now*0.6+p.gj*9)*5;
+      persp=1-p.gu*0.45;
+      isHeartSprite=true;
+      sizeMul=p.gs*(0.6+0.4*gScale);
+    }
+    else if(mode==="text1"){
+      tx=p.tx + Math.sin(now*p.tws+p.tw)*0.3;   // near-zero drift: letters stay crisp
+      ty=p.ty + Math.cos(now*p.tws*0.8+p.tw)*0.3;
+      persp=1;
+    }
+    else { /* heart */
+      if(p.type==="heart"){
+        const x=p.hx*cosA - p.hy*sinA;
+        let   yd=p.hx*sinA + p.hy*cosA;
+        let   z=p.hz;
+        const z2=z*Math.cos(tilt)-yd*Math.sin(tilt);     // slight forward tilt
+        yd=z*Math.sin(tilt)+yd*Math.cos(tilt); z=z2;
+        persp=fov/(fov+yd);
+        tx=CX + x*R*beatScale*persp;
+        ty=CY - z*R*beatScale*persp*1.02 + R*0.06;
+      } else {
+        p.op+=p.os*dt;
+        const ex=Math.cos(p.op)*p.or, ey=Math.sin(p.op)*p.or*p.ow;
+        const x=ex*cosA - ey*sinA;
+        const yd=ex*sinA + ey*cosA;
+        const z=Math.sin(p.op*2+p.oi*4)*0.35 + p.oi;
+        persp=fov/(fov+yd);
+        tx=CX + x*R*persp;
+        ty=CY - z*R*persp + R*0.06;
+      }
+    }
+
+    /* chase target */
+    const k=(mode==="galaxy"?0.055:(mode==="heart"?Math.min(formK,p.k*4):0.16));
+    p.x+=(tx-p.x)*k;
+    p.y+=(ty-p.y)*k;
+
+    /* mouse flow — swirl + gentle repulsion (off during text: readability first) */
+    if(mouse.active && mode!=="text1"){
+      const dx=p.x-mouse.ax, dy=p.y-mouse.ay, d2=dx*dx+dy*dy;
+      const RAD=MOBILE?110:150;
+      if(d2<RAD*RAD && d2>4){
+        const d=Math.sqrt(d2), f=(1-d/RAD);
+        const inv=1/d;
+        p.x+=(dx*inv*1.6 + -dy*inv*2.1)*f*60*dt;
+        p.y+=(dy*inv*1.6 +  dx*inv*2.1)*f*60*dt;
+      }
+    }
+
+    /* draw */
+    p.tw+=p.tws*dt;
+    const flicker=0.7+0.3*Math.sin(p.tw);
+    if(isHeartSprite){
+      const s=(5+9*persp)*sizeMul;
+      ctx.globalAlpha=clamp((0.35+0.5*persp)*flicker*gScale,0,1);
+      ctx.drawImage(HEARTS[p.hi], p.x-s/2, p.y-s/2, s, s);
+    } else if(mode==="text1"){
+      const f=0.85+0.15*Math.sin(p.tw);          // steady, bright, compact dots
+      const s=p.sz*2.4;
+      ctx.globalAlpha=clamp(0.95*f,0,1);
+      ctx.drawImage(TXTDOTS[p.ci], p.x-s/2, p.y-s/2, s, s);
+    } else {
+      const glow=mode==="heart"?(0.65+0.55*pulse*persp):0.85;
+      const s=p.sz*(0.6+persp)*(mode==="heart"?(1+0.22*pulse):1)*2.3;
+      const base=p.type==="orbit"?0.30:(p.edge?0.85:0.5);
+      ctx.globalAlpha=clamp(base*flicker*glow,0,1);
+      ctx.drawImage(DOTS[p.ci], p.x-s/2, p.y-s/2, s, s);
+      if(p.sz>2.9){
+        ctx.globalAlpha=clamp(0.35*flicker,0,1);
+        ctx.drawImage(WHITEDOT, p.x-s*0.22, p.y-s*0.22, s*0.44, s*0.44);
+      }
+    }
+  }
+  ctx.globalAlpha=1;
+  ctx.globalCompositeOperation="source-over";
+
+  /* final message */
+  if(mt>=T_FINAL && !$("final").classList.contains("show"))
+    $("final").classList.add("show");
+}
+
+/* ---------------- code editor: self-typing ------------------------------ */
+const CODE_LINES=[
+  [["cmt","// SweetDreams.exe — main loop"]],
+  [["kw","while"],["pn"," ("],["id","night"],["pn",") {"]],
+  [["pn","  "],["id","stars"],["pn","."],["fn","shine"],["pn","();"]],
+  [["pn","  "],["id","dreams"],["pn","."],["fn","load"],["pn","("],["str","\"sweet\""],["pn",");"]],
+  [["pn","}"]],
+  [["pn",""]],
+  [["kw","if"],["pn"," ("],["id","worries"],["pn","."],["id","length"],["op"," > "],["num","0"],["pn",") {"]],
+  [["pn","  "],["id","worries"],["pn","."],["fn","clear"],["pn","();"]],
+  [["pn","}"]],
+  [["pn",""]],
+  [["cmt","// rest well. tomorrow is yours."]],
+];
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function typeCode(){
+  const body=$("codeBody");
+  const caret=document.createElement("span");
+  caret.className="caret";
+  for(const line of CODE_LINES){
+    const div=document.createElement("div");
+    div.className="cl";
+    body.appendChild(div);
+    div.appendChild(caret);
+    for(const [cls,text] of line){
+      const span=document.createElement("span");
+      span.className=cls;
+      div.insertBefore(span,caret);
+      for(const ch of text){
+        span.textContent+=ch;
+        await sleep(rnd(24,55));
+      }
+    }
+    await sleep(rnd(120,300));
+  }
+}
+
+/* ---------------- boot sequence ----------------------------------------- */
+const BOOT_LINES=[
+  {t:"Initializing night mode...",       d:520},
+  {t:"Loading stars...",                 d:620},
+  {t:"Clearing today's worries...",      d:780, cls:"ok"},
+  {t:"Preparing sweet dreams...",        d:520, cls:"hl"},
+];
+let skipBoot=false;
+$("skip").addEventListener("click",()=>{ skipBoot=true; });
+$("boot").addEventListener("click",e=>{ if(e.target.id!=="skip") skipBoot=true; });
+
+async function typeTerm(line){
+  const div=document.createElement("div");
+  div.className="tline"+(line.cls?" "+line.cls:"");
+  const prompt=document.createElement("span");
+  prompt.className="p"; prompt.textContent="> ";
+  const txt=document.createElement("span");
+  const caret=document.createElement("span"); caret.className="caret";
+  div.append(prompt,txt,caret);
+  $("termLines").appendChild(div);
+  for(const ch of line.t){
+    txt.textContent+=ch;
+    if(!skipBoot) await sleep(rnd(16,46));
+  }
+  caret.remove();
+  if(!skipBoot) await sleep(line.d);
+}
+
+async function boot(){
+  await sleep(700);
+  for(const line of BOOT_LINES) await typeTerm(line);
+
+  /* progress bar */
+  $("progWrap").style.display="block";
+  const t0=performance.now(), DUR=skipBoot?150:2100;
+  await new Promise(res=>{
+    (function tick(){
+      let u=clamp((performance.now()-t0)/DUR,0,1);
+      u=1-Math.pow(1-u,2.4);                       // ease-out, with hesitation
+      const pct=Math.min(100, Math.round(u*100 + (u<0.97?Math.sin(u*40)*1.2:0)));
+      $("progFill").style.width=pct+"%";
+      $("progPct").textContent=pct+"%";
+      if(u>=1){ $("progPct").textContent="100%"; $("progFill").style.width="100%"; res(); }
+      else requestAnimationFrame(tick);
+    })();
+  });
+  await sleep(skipBoot?80:350);
+  await typeTerm({t:"SweetDreams.exe launched successfully.", d:300, cls:"ok"});
+  await typeTerm({t:"entering dreamland...", d:skipBoot?100:800});
+
+  /* hand off to main scene */
+  $("boot").classList.add("gone");
+  $("skip").style.display="none";
+  document.body.classList.add("main");
+  $("coreGlow").style.opacity="1";
+  mainStart=performance.now()/1000;
+  setMode("heart");
+  setTimeout(()=>$("names").classList.remove("hidden"),1800);
+  setTimeout(typeCode, 1200);
+}
+
+$("replay").addEventListener("click",()=>location.reload());
+
+/* debug: jump the timeline to second s (verification aid) */
+window.__seek = s => { mainStart = performance.now()/1000 - s; };
+
+/* ---------------- go ----------------------------------------------------- */
+resize();
+requestAnimationFrame(frame);
+boot();
+</script>
+</body>
+</html>
